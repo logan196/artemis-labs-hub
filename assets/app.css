@@ -130,3 +130,11 @@ body.lit .copy{opacity:1;transform:none}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}.row{opacity:1}}
 main:focus,main:focus-visible{outline:none}
+
+/* Lock screen */
+.lock .lockcard{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-top:8px;padding:22px;border:1px solid var(--line);border-radius:var(--r,12px);background:var(--card);max-width:420px}
+.lock #recForm{display:flex;gap:8px;width:100%}
+.lock #recForm input{flex:1;height:40px;padding:0 12px;border-radius:var(--r,12px);border:1px solid var(--line-h);background:var(--ink);color:var(--snow);font:400 13px/1 var(--mono,monospace)}
+.lock .lockerr{min-height:1.2em;margin:0;font-size:12.5px;color:#f08c8c}
+.lock .locknote{margin:0;font-size:13px;color:var(--dim)}
+.lock .lnk{background:none;border:0;padding:0;cursor:pointer;text-align:left}

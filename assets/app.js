@@ -1,4 +1,6 @@
 // Artemis Biolabs client hub. Hash routes: #/  #/lab/<id>  #/lab/<id>/<report>
+// Content is encrypted at rest (data/payload.enc.json); see assets/lock.js.
+import * as LOCK from "./lock.js";
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const main = $("#main");
@@ -115,9 +117,49 @@ function route() {
   main.focus({ preventScroll: true });
 }
 
+function unlockScreen() {
+  document.title = "Artemis Biolabs";
+  return new Promise(async (resolve) => {
+    const kw = await LOCK.fetchKeywrap();
+    main.innerHTML = `<section class="page lock"><div class="head"><p class="over">Private</p><h1>Client hub</h1><p class="sub">This hub is encrypted. Unlock to continue.</p></div>
+      <div class="lockcard">
+        ${kw ? `<button class="btn" id="touchBtn" type="button">Unlock with Touch&nbsp;ID</button>`
+             : `<p class="locknote">No passkey enrolled yet — run <a href="setup.html">setup</a> once, or use the recovery key.</p>`}
+        <button class="lnk" id="recToggle" type="button">Use recovery key</button>
+        <form id="recForm" hidden><input id="recKey" type="password" placeholder="Recovery key (64 hex characters)" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Unlock</button></form>
+        <p class="lockerr" id="lockErr" role="alert"></p>
+      </div></section>`;
+    const err = (m) => { $("#lockErr").textContent = m; };
+    const finish = async (masterRaw) => {
+      const payload = await LOCK.decryptPayload(masterRaw);
+      LOCK.remember(masterRaw);
+      resolve(payload);
+    };
+    $("#touchBtn")?.addEventListener("click", async () => {
+      err("");
+      try {
+        const kek = await LOCK.deriveKEK(await LOCK.assertPRF(kw));
+        await finish(await LOCK.unwrapMaster(kek, kw));
+      } catch (e) {
+        err(e?.message === "no-prf"
+          ? "This browser couldn't evaluate the passkey PRF — try Safari, or use the recovery key."
+          : "Touch ID didn't complete. Try again or use the recovery key.");
+      }
+    });
+    $("#recToggle").addEventListener("click", () => { $("#recForm").hidden = false; $("#recKey").focus(); });
+    $("#recForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); err("");
+      const h = $("#recKey").value.trim().toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(h)) return err("That isn't a 64-character hex key.");
+      try { await finish(LOCK.hex.dec(h)); } catch { err("Wrong key."); }
+    });
+  });
+}
+
 (async () => {
-  DATA = await (await fetch("data/labs.json")).json();
+  let payload = await LOCK.tryResume();
+  if (!payload) payload = await unlockScreen();
+  ({ DATA, REND } = LOCK.hydrate(payload));
   route();
   addEventListener("hashchange", route);
-  try { REND = await (await fetch("data/renderings.json")).json(); if (REND.items?.length) route(); } catch {}
 })();

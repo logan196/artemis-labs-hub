@@ -1,0 +1,9 @@
+.DS_Store
+# Private content — lives only locally and inside data/payload.enc.json
+data/labs.json
+data/renderings.json
+assets/pi/
+assets/logos/
+assets/hero/
+renderings/*.webp
+renderings/*.mp4
