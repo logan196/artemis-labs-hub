@@ -1,6 +1,6 @@
 // Artemis Biolabs client hub. Hash routes: #/  #/lab/<id>  #/lab/<id>/<report>
 // Content is encrypted at rest (data/payload.enc.json); see assets/lock.js.
-import * as LOCK from "./lock.js";
+import * as LOCK from "./lock.js?v=3";
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const main = $("#main");
@@ -151,7 +151,11 @@ function unlockScreen() {
         try { return await finish(LOCK.hex.dec(v.toLowerCase())); } catch { return err("Wrong key."); }
       }
       if (!pwrap) return err("No password is set — paste the 64-character recovery key.");
-      try { await finish(await LOCK.unwrapWithPassword(v, pwrap)); } catch { err("Wrong password."); }
+      // Tolerate the common case slips before giving up.
+      for (const guess of [...new Set([v, v.toLowerCase(), v[0].toUpperCase() + v.slice(1).toLowerCase(), v.toUpperCase()])]) {
+        try { return await finish(await LOCK.unwrapWithPassword(guess, pwrap)); } catch {}
+      }
+      err("Wrong password.");
     });
     $("#recKey").focus();
   });
