@@ -67,6 +67,27 @@ export async function fetchKeywrap() {
   } catch { return null; }
 }
 
+export async function fetchPasswrap() {
+  try {
+    const r = await fetch("data/passwrap.json", { cache: "no-store" });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+// Derives the master key from a password via PBKDF2 and the committed wrap.
+export async function unwrapWithPassword(pw, passwrap) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const kek = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: b64.dec(passwrap.salt), iterations: passwrap.iter },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"],
+  );
+  const raw = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: b64.dec(passwrap.wrapIv) }, kek, b64.dec(passwrap.wrappedKey),
+  );
+  return new Uint8Array(raw);
+}
+
 export async function decryptPayload(masterRaw) {
   const env = await (await fetch("data/payload.enc.json")).json();
   const key = await crypto.subtle.importKey("raw", masterRaw, "AES-GCM", false, ["decrypt"]);

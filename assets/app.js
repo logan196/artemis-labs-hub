@@ -120,13 +120,11 @@ function route() {
 function unlockScreen() {
   document.title = "Artemis Biolabs";
   return new Promise(async (resolve) => {
-    const kw = await LOCK.fetchKeywrap();
+    const [kw, pwrap] = await Promise.all([LOCK.fetchKeywrap(), LOCK.fetchPasswrap()]);
     main.innerHTML = `<section class="page lock"><div class="head"><p class="over">Private</p><h1>Client hub</h1><p class="sub">This hub is encrypted. Unlock to continue.</p></div>
       <div class="lockcard">
-        ${kw ? `<button class="btn" id="touchBtn" type="button">Unlock with Touch&nbsp;ID</button>`
-             : `<p class="locknote">No passkey enrolled yet — run <a href="setup.html">setup</a> once, or use the recovery key.</p>`}
-        <button class="lnk" id="recToggle" type="button">Use recovery key</button>
-        <form id="recForm" hidden><input id="recKey" type="password" placeholder="Recovery key (64 hex characters)" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Unlock</button></form>
+        ${kw ? `<button class="btn" id="touchBtn" type="button">Unlock with Touch&nbsp;ID</button>` : ""}
+        <form id="recForm"><input id="recKey" type="password" placeholder="${pwrap ? "Password" : "Recovery key (64 hex characters)"}" autocomplete="current-password" spellcheck="false"><button class="btn" type="submit">Unlock</button></form>
         <p class="lockerr" id="lockErr" role="alert"></p>
       </div></section>`;
     const err = (m) => { $("#lockErr").textContent = m; };
@@ -146,13 +144,16 @@ function unlockScreen() {
           : "Touch ID didn't complete. Try again or use the recovery key.");
       }
     });
-    $("#recToggle").addEventListener("click", () => { $("#recForm").hidden = false; $("#recKey").focus(); });
     $("#recForm").addEventListener("submit", async (e) => {
       e.preventDefault(); err("");
-      const h = $("#recKey").value.trim().toLowerCase();
-      if (!/^[0-9a-f]{64}$/.test(h)) return err("That isn't a 64-character hex key.");
-      try { await finish(LOCK.hex.dec(h)); } catch { err("Wrong key."); }
+      const v = $("#recKey").value.trim();
+      if (/^[0-9a-f]{64}$/i.test(v)) {
+        try { return await finish(LOCK.hex.dec(v.toLowerCase())); } catch { return err("Wrong key."); }
+      }
+      if (!pwrap) return err("No password is set — paste the 64-character recovery key.");
+      try { await finish(await LOCK.unwrapWithPassword(v, pwrap)); } catch { err("Wrong password."); }
     });
+    $("#recKey").focus();
   });
 }
 
